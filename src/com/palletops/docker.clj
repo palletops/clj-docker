@@ -5,7 +5,8 @@
    [clj-http.client :as http]
    [clojure.java.io :refer [copy file reader]]
    [clojure.string :as string :refer [blank? lower-case split]]
-   [com.palletops.api-builder.api :refer [defn-api]]
+   [com.palletops.api-builder.api
+    :refer [defn-api defmulti-api defmethod-api def-api]]
    [schema.core :as schema :refer [eq explain optional-key]])
   (:import
    org.apache.commons.codec.binary.Base64
@@ -122,16 +123,22 @@
                                   :VolumesFrom String
                                   :WorkingDir String
                                   :DisableNetwork schema/Bool
-                                  :ExposedPorts {String schema/Any}}}
+                                  :ExposedPorts {String schema/Any}}
+                      :doc-url "create-a-container"
+                      :doc "Create a container"}
    :container {:path {:fmt "/containers/%s/json"
                       :args {:id ContainerId}
                       :arg-order [:id]}
-               :method :get}
+               :method :get
+               :doc-url "inspect-a-container"
+               :doc "Return low-level information on the container id"}
    :container-processes {:path {:fmt "/containers/%s/top"
                                 :args {:id ContainerId}
                                 :arg-order [:id]}
                          :method :get
-                         :query-params {:ps_args String}}
+                         :query-params {:ps_args String}
+                         :doc-url "list-processes-running-inside-a-container"
+                         :doc "List processes running inside the container id"}
    :container-logs {:path {:fmt "/containers/%s/logs"
                            :args {:id ContainerId}
                            :arg-order [:id]}
@@ -140,17 +147,23 @@
                     :query-params {:follow schema/Bool
                                    :stdout schema/Bool
                                    :stderr schema/Bool
-                                   :timestamps schema/Bool}}
+                                   :timestamps schema/Bool}
+                    :doc-url "get-container-logs"
+                    :doc "Get stdout and stderr logs from the container id"}
    :container-changes {:path {:fmt "/containers/%s/changes"
                               :args {:id ContainerId}
                               :arg-order [:id]}
                        :method :get
                        :return [{:Kind schema/Int
-                                 :Path String}]}
+                                 :Path String}]
+                       :doc-url "inspect-changes-on-a-containers-filesystem"
+                       :doc "Inspect changes on container id's filesystem."}
    :container-export {:path {:fmt "/containers/%s/export"
                              :args {:id ContainerId}
                              :arg-order [:id]}
-                      :method :get}
+                      :method :get
+                      :doc-url "export-a-container"
+                      :doc "Export the contents of container id"}
    :container-start {:path {:fmt "/containers/%s/start"
                             :args {:id ContainerId}
                             :arg-order [:id]}
@@ -159,71 +172,104 @@
                                  :LxcConf {String schema/Any}
                                  :PortBindings {String schema/Any}
                                  :PublishAllPorts schema/Bool
-                                 :Privileged schema/Bool}}
+                                 :Privileged schema/Bool}
+                     :doc-url "start-a-container"
+                     :doc "Start the container id."}
    :container-stop {:path {:fmt "/containers/%s/stop"
                            :args {:id ContainerId}
                            :arg-order [:id]}
                     :method :post
-                    :query-params {:t schema/Int}}
+                    :query-params {:t schema/Int}
+                    :doc-url "stop-a-container"
+                    :doc "Stop the container id."}
    :container-restart {:path {:fmt "/containers/%s/restart"
                               :args {:id ContainerId}
                               :arg-order [:id]}
                        :method :post
-                       :query-params {:t schema/Int}}
+                       :query-params {:t schema/Int}
+                       :doc-url "restart-a-container"
+                       :doc "Restart the container id"}
    :container-kill {:path {:fmt "/containers/%s/kill" :args {:id ContainerId}
                            :arg-order [:id]}
                     :method :post
-                    :query-params {:signal (schema/either String schema/Int)}}
-   :container-wait {:path {:fmt "/containers/%s/wait" :args {:id ContainerId}
-                           :arg-order [:id]}
-                    :method :post}
+                    :query-params {:signal (schema/either String schema/Int)}
+                    :doc-url "kill-a-container"
+                    :doc "Kill the container id"}
+   :container-wait
+   {:path {:fmt "/containers/%s/wait" :args {:id ContainerId}
+           :arg-order [:id]}
+    :method :post
+    :doc-url "wait-a-container"
+    :doc "Block until container id stops, then returns the exit code."}
    :container-delete {:path {:fmt "/containers/%s" :args {:id ContainerId}
                              :arg-order [:id]}
                       :method :delete
                       :query-params {:force schema/Bool
-                                     :v schema/Bool}}
+                                     :v schema/Bool}
+                      :doc-url "remove-a-container"
+                      :doc "Remove the container id from the filesystem."}
    :container-copy {:path {:fmt "/containers/%s/copy" :args {:id ContainerId}
                            :arg-order [:id]}
                     :method :post
                     :headers {:accept "application/x-tar"}
-                    :json-body {:Resource String}}
+                    :json-body {:Resource String}
+                    :doc-url "copy-files-or-folders-from-a-container"
+                    :doc "Copy files or folders of container id."}
 
    :images {:path {:fmt "/images/json"}
-            :method :get}
-   :image-create {:path {:fmt "/images/%s/create" :args {:name String}
-                         :arg-order [:name]}
-                  :method :post
-                  :base64-json-headers {:X-Registry-Auth schema/Any}
-                  :query-params {:repo String
-                                 :tag String
-                                 :registry String
-                                 :fromSource String}}
+            :method :get
+            :doc-url "list-images"
+            :doc "List images."}
+   :image-create
+   {:path {:fmt "/images/%s/create" :args {:name String}
+           :arg-order [:name]}
+    :method :post
+    :base64-json-headers {:X-Registry-Auth schema/Any}
+    :query-params {:repo String
+                   :tag String
+                   :registry String
+                   :fromSource String}
+    :doc-url "create-an-image"
+    :doc
+    "Create an image, either by pull it from the registry or by importing it."}
    :image-insert {:path {:fmt "/images/%s/insert" :args {:name String}
                          :arg-order [:name]}
                   :method :post
                   :query-params {:path String
-                                 :url String}}
+                                 :url String}
+                  :doc-url "insert-a-file-in-an-image"
+                  :doc "Insert a file from url in the image name at path."}
    :image {:path {:fmt "/images/%s/json" :args {:name String}
                   :arg-order [:name]}
-           :method :get}
+           :method :get
+           :doc-url "inspect-an-image"
+           :doc "Return low-level information on the image name."}
    :image-history {:path {:fmt "/images/%s/history" :args {:name String}
                           :arg-order [:name]}
-                   :method :get}
+                   :method :get
+                   :doc-url "get-the-history-of-an-image"
+                   :doc "Return the history of the image name"}
    :image-push {:path {:fmt "/images/%s/push" :args {:name String}
                        :arg-order [:name]}
                 :method :post
                 :base64-json-headers {:X-Registry-Auth schema/Any}
-                :query-params {:registry String}}
+                :query-params {:registry String}
+                :doc-url "push-an-image-on-the-registry"
+                :doc "Push the image name on the registry."}
    :image-tag {:path {:fmt "/images/%s/tag" :args {:name String}
                       :arg-order [:name]}
                :method :post
                :query-params {:force schema/Bool
-                              :repo String}}
+                              :repo String}
+               :doc-url "tag-an-image-into-a-repository"
+               :doc "Tag the image name into a repository."}
    :image-delete {:path {:fmt "/images/%s" :args {:name String}
                          :arg-order [:name]}
                   :method :delete
                   :query-params {:force schema/Bool
-                                 :noprune schema/Bool}}
+                                 :noprune schema/Bool}
+                  :doc-url "remove-an-image"
+                  :doc "Remove the image name from the filesystem."}
 
    :build {:path {:fmt "/build"}
            :method :post
@@ -366,10 +412,11 @@
 
 ;;; Functions to build http request maps for sending to the api.
 
-(defmulti api-req
+(defmulti-api api-req
   "Given an api command keyword and a map of arguments, return an http
   request map.  The request has a :path element specifying the http
   path."
+  {:sig [[schema/Keyword {schema/Any schema/Any} :- {schema/Any schema/Any}]]}
   (fn [command args] command))
 
 (defn api-req-method
@@ -382,7 +429,7 @@
   (let [args (merge query-params (:args path) json-body headers
                     (select-keys api-def [:body]))
         argmap (gensym "argmap")]
-    `(defmethod api-req ~command
+    `(defmethod-api api-req ~command
        [_# {:keys [~@(map #(symbol (name %)) (keys args))] :as ~argmap}]
        {:method ~method
         :path (format ~(:fmt path) ~@(map (comp symbol name) (:arg-order path)))
@@ -445,9 +492,10 @@
 
 ;;; # Map based calls to Docker API
 
-(defmulti docker
+(defmulti-api docker
   "Call the docker API based on a map specifying the command to be called,
   and and arguments."
+  {:sig [[{:url String} {schema/Any schema/Any} :- {schema/Any schema/Any}]]}
   (fn [{:keys [url] :as endpoint}
        {:keys [command] :as request}]
     {:pre [(keyword? command)]}
@@ -456,14 +504,14 @@
 
 ;;; The default implementation is suitable for most endpoints, but
 ;;; some commands require extra processing.
-(defmethod docker :default
+(defmethod-api docker :default
   [endpoint {:keys [command all limit since before size] :as request}]
   (let [req (api-req command (dissoc request :command))]
     (api-call endpoint (:path req) (dissoc req :path))))
 
 ;;; ## Containers
 
-(defmethod docker :container-logs
+(defmethod-api docker :container-logs
   [endpoint {:keys [command id follow stdout stderr timestamps] :as request}]
   {:pre [id (string? id)]}
   (let [req (api-req :container-logs (dissoc request :command))
@@ -474,14 +522,19 @@
       (let [res (read-stream-records (:body resp) (constantly false))]
         (assoc resp :body res)))))
 
-(defn parse-hdr [s]
+(defn- parse-hdr
+  "Parse a header into a keyword value pair."
+  [s]
   (let [[h v] (split s #": " 2)]
     [(keyword (lower-case h)) v]))
 
-(defn attach
+(defn- attach
+  "Call the attach endpoint.  We have to use a plain socket to be able
+  to handle the connection hijacking that docker does."
   [url-str]
   (let [url (URL. url-str)
-        ^InetSocketAddress address (InetSocketAddress. (.getHost url) (.getPort url))
+        ^InetSocketAddress address (InetSocketAddress.
+                                    (.getHost url) (.getPort url))
         socket (doto (Socket.)
                  (.connect address (int 10000)))
         is (.getInputStream socket)
@@ -526,7 +579,7 @@
 ;; The general problem here is knowing when to detach.  The api will
 ;; close the output stream only when (and as soon as) the input stream
 ;; is closed.
-(defmethod docker :container-attach
+(defmethod-api docker :container-attach
   [endpoint
    {:keys [command id result-as body body-stream logs stream
            stdin stdout stderr break-fn filter-fn]
@@ -555,7 +608,7 @@
       :map (let [res (read-stream-records (:body resp) break-fn filter-fn)]
              (assoc resp :body res)))))
 
-(defmethod docker :container-shell
+(defmethod-api docker :container-shell
   ;; "Attach to a shell running in a docker container, and execute
   ;; commands in a subshell."
   [endpoint
@@ -598,7 +651,7 @@ echo %s $?
         resp))))
 
 ;; send a file to the container
-(defmethod docker :container-file
+(defmethod-api docker :container-file
   [endpoint
    {:keys [id break-fn path local-file content]
     :or {break-fn (constantly true)}
@@ -626,7 +679,7 @@ echo %s $?
              :id id})))
 
 ;; receive a file from the container
-(defmethod docker :container-file
+(defmethod-api docker :container-file
   [endpoint
    {:keys [id break-fn path local-file content]
     :or {break-fn (constantly true)}
