@@ -416,7 +416,7 @@
   "Given an api command keyword and a map of arguments, return an http
   request map.  The request has a :path element specifying the http
   path."
-  {:sig [[schema/Keyword {schema/Any schema/Any} :- {schema/Any schema/Any}]]}
+  ; {:sig [[schema/Keyword {schema/Any schema/Any} :- {schema/Any schema/Any}]]}
   (fn [command args] command))
 
 (defn api-req-method
