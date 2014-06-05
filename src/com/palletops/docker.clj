@@ -396,8 +396,8 @@
     `(defn-api ~(symbol (str (name command) "-map"))
        {:sig [[(api-map-args ~command)
                :- (api-map-return ~command)]]}
-       [{:keys [~@(map #(symbol (name %)) (keys args))] :as args#}]
-       (assoc args# :command ~command))))
+       [{:keys [~@(map #(symbol (name %)) (keys args))] :as ~'params}]
+       (assoc ~'params :command ~command))))
 
 (defmacro api-maps []
   `(do
