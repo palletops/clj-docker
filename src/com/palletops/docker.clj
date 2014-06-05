@@ -472,15 +472,19 @@
                    base64-json-headers doc doc-url]
             :or {method :get}
             :as api-def}]
-  (let [args (merge query-params (:args path) json-body headers)]
+  (let [args (merge query-params (:args path) json-body headers)
+        has-params? (seq (keys args))]
     `(defn-api ~(symbol (name command))
        {:sig [[String
-               (api-map-args ~command)
+               ~@(if has-params?
+                   [`(api-map-args ~command)])
                :- (api-map-return ~command)]]
         :doc ~(str doc \newline \newline "See " doc-url-prefix doc-url)}
-       [endpoint# {:keys [~@(map (comp symbol name) (keys args))] :as args#}]
-       (let [req# (api-req ~command args#)]
-         (api-call endpoint# (:path req#) (dissoc req# :path))))))
+       [~'endpoint
+        ~@(if has-params?
+            [`{:keys [~@(map (comp symbol name) (keys args))] :as ~'params}])]
+       (let [req# (api-req ~command ~(if has-params? 'params {}))]
+         (api-call ~'endpoint (:path req#) (dissoc req# :path))))))
 
 (defmacro api-calls []
   `(do
