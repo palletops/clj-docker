@@ -478,7 +478,7 @@
                (api-map-args ~command)
                :- (api-map-return ~command)]]
         :doc ~(str doc \newline \newline "See " doc-url-prefix doc-url)}
-       [endpoint# {:keys [~@(keys args)] :as args#}]
+       [endpoint# {:keys [~@(map (comp symbol name) (keys args))] :as args#}]
        (let [req# (api-req ~command args#)]
          (api-call endpoint# (:path req#) (dissoc req# :path))))))
 
