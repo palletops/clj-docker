@@ -373,7 +373,10 @@
      (zipmap
       (map #(optional-key %) (keys query-params))
       (vals query-params))
-     (:args path) json-body)))
+     (:args path)
+     (zipmap
+      (map #(optional-key %) (keys json-body))
+      (vals json-body)))))
 
 (defn api-map-return
   "Define a schema for a map return arguments."
@@ -385,7 +388,9 @@
       (map #(optional-key %) (keys query-params))
       (vals query-params))
      (:args path)
-     json-body
+     (zipmap
+      (map #(optional-key %) (keys json-body))
+      (vals json-body))
      {:command (eq command)})))
 
 
