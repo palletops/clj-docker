@@ -223,8 +223,7 @@
             :doc-url "list-images"
             :doc "List images."}
    :image-create
-   {:path {:fmt "/images/%s/create" :args {:name String}
-           :arg-order [:name]}
+   {:path {:fmt "/images/create"}
     :method :post
     :base64-json-headers {:X-Registry-Auth schema/Any}
     :query-params {:repo String
