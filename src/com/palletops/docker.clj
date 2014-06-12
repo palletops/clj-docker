@@ -309,6 +309,7 @@
           :doc "Ping the docker server."}
    :commit
    {:path {:fmt "/commit"}
+    :method :post
     :query-params {:container ContainerId
                    :repo String
                    :tag String
