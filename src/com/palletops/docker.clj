@@ -7,7 +7,8 @@
    [clojure.string :as string :refer [blank? lower-case split]]
    [com.palletops.api-builder.api
     :refer [defn-api defmulti-api defmethod-api def-api]]
-   [schema.core :as schema :refer [eq explain optional-key]])
+   [schema.core :as schema :refer [eq explain optional-key]]
+   [taoensso.timbre :refer [debugf]])
   (:import
    org.apache.commons.codec.binary.Base64
    [java.net InetSocketAddress Socket URL]
@@ -17,6 +18,7 @@
 (defn api-call
   "Call the docker api via http."
   [{:keys [url] :as endpoint} path request]
+  (debugf "api-call %s %s %s" endpoint path request)
   (http/request
    (merge
     {:url (str url path)
@@ -37,9 +39,9 @@
 
 (defn read-record
   [^InputStream dis]
-  (println "read-record")
+  ;; (println "read-record")
   (let [n (.read dis resp-buf 0 8)]
-    (println "read-record n" n)
+    ;; (println "read-record n" n)
     (when (pos? n)
       (assert (= n 8))
       (.rewind hdr-bb)
@@ -62,7 +64,7 @@
   stream type keyword and stream content returns true.  break-fn is called with
   :entry before anything is read."
   ([is break-fn filter-fn]
-     (println "Filter-fn" filter-fn)
+     ;; (println "Filter-fn" filter-fn)
      (with-open [is is]
        (if-not (break-fn :entry nil)
          (loop [res {}]
@@ -601,12 +603,13 @@
     (when (string? body)
       (.write (:input resp) (.getBytes body "UTF-8"))
       (.flush (:input resp))
-      (println "wrote" (pr-str body)))
+      ;; (println "wrote" (pr-str body))
+      )
     (when body-stream
-      (println "copying body-stream")
+      ;; (println "copying body-stream")
       (copy body-stream (:input resp))
       (.flush (:input resp)))
-    (println "result-as" result-as)
+    ;; (println "result-as" result-as)
     (case result-as
       :stream resp
       :map (let [res (read-stream-records (:body resp) break-fn filter-fn)]
@@ -619,7 +622,7 @@
    {:keys [id break-fn commands filter-fn]
     :or {filter-fn identity}
     :as request}]
-  (println "container-shell filter-fn" filter-fn)
+  ;; (println "container-shell filter-fn" filter-fn)
   (let [eoc (gensym "EXIT")
         eof (gensym "EOF")
         break-fn (or break-fn
@@ -632,7 +635,7 @@ cat << '%s' > cmd$$
 echo %s $?
 "
                      eof commands eof eoc)]
-    (println "body" body)
+    ;; (println "body" body)
     (let [resp (docker endpoint
                        {:command :container-attach
                         :id id
@@ -646,12 +649,15 @@ echo %s $?
           resp (assoc (update-in resp [:body] dissoc :stdout :stderr)
                  :out (:stdout (:body resp))
                  :err (:stderr (:body resp)))]
-      (println "resp" (pr-str resp))
+      ;; (println "resp" (pr-str resp))
+      (debugf "container-shell resp :err %s" (pr-str (:err resp)))
       (if-let [[st e] (if-let [out (:out resp)]
                         (re-find (re-pattern (str eoc " " "([0-9]+)")) out))]
-        (-> resp
-            (assoc :exit (Integer/parseInt e))
-            (update-in [:out] string/replace st ""))
+        (let [resp (-> resp
+                       (assoc :exit (Integer/parseInt e))
+                       (update-in [:out] string/replace st ""))]
+          (debugf "container-shell resp %s" (pr-str resp))
+          resp)
         resp))))
 
 ;; send a file to the container
@@ -664,7 +670,7 @@ echo %s $?
         body-stream (if local-file
                       (reader (file local-file))
                       content)]
-    (println "body" body)
+    ;; (println "body" body)
     (docker endpoint
             {:command :container-attach
              :id id
@@ -692,7 +698,7 @@ echo %s $?
         body-stream (if local-file
                       (reader (file local-file))
                       content)]
-    (println "body" body)
+    ;; (println "body" body)
     (docker endpoint
             {:command :container-attach
              :id id
