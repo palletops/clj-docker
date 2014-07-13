@@ -3,6 +3,7 @@
   (:require
    [cheshire.core :as json]
    [clj-http.client :as http]
+   [clj-http.core :as http-core]
    [clojure.java.io :refer [copy file reader]]
    [clojure.string :as string :refer [blank? lower-case split]]
    [com.palletops.api-builder.api
@@ -12,14 +13,117 @@
   (:import
    org.apache.commons.codec.binary.Base64
    [java.net InetSocketAddress Socket URL]
-   [java.io InputStream]))
+   [java.io InputStream]
+   [com.fasterxml.jackson.core JsonParser]))
+
+
+;;; # http
+(defn wrap-log-response
+  [client]
+  (fn [request]
+    (debugf "wrap-log-response calling client")
+    (let [resp (client request)]
+      (debugf "wrap-log-response response is %s" resp)
+      ;; (debugf "wrap-log-response response body is <<%s>>"
+      ;;         (if (:body resp) (String. (:body resp) "UTF-8")))
+      resp)))
+
+
+;; The build endpoint returns a sequence of json objects without
+;; wrapping in an array, so we can't use clj-http's built in json
+;; decoding.
+
+(defn ^JsonParser json-parser
+  [^java.io.Reader rdr]
+  (.createJsonParser
+   ^JsonFactory (or cheshire.factory/*json-factory*
+                    cheshire.factory/json-factory)
+   rdr))
+
+(defn json-decode-stream
+  "Return a lazy sequence of json objects returned by the parser."
+  [^JsonParser parser]
+  (lazy-seq
+   (if-let [v (cheshire.parse/parse parser keyword nil nil)]
+     (cons v (json-decode-stream parser)))))
+
+(def utf-8 (java.nio.charset.Charset/forName "UTF-8"))
+
+(defn json-decode
+  [^String s]
+  (debugf "json-decode %s" s)
+  (with-open [is (java.io.ByteArrayInputStream. (.getBytes s utf-8))
+              r (reader is)]
+    (let [parser (json-parser r)
+          resp (json-decode-stream parser)]
+      (if (= 1 (count resp))
+        (first resp)
+        (vec resp)))))
+
+
+(defn coerce-json-body
+  [{:keys [coerce]} {:keys [body status] :as resp} keyword? strict? & [charset]]
+  (let [^String charset (or charset (-> resp :content-type-params :charset) "UTF-8")
+        body (clj-http.util/force-byte-array body)
+        decode-func json-decode]
+    (debugf "coerce-json-body %s %s" coerce (http/unexceptional-status? status))
+    (cond
+     (= coerce :always)
+     (assoc resp :body (decode-func (String. ^"[B" body charset)))
+
+     (and (http/unexceptional-status? status)
+          (or (nil? coerce) (= coerce :unexceptional)))
+     (assoc resp :body (decode-func (String. ^"[B" body charset)))
+
+     (and (not (http/unexceptional-status? status)) (= coerce :exceptional))
+     (assoc resp :body (decode-func (String. ^"[B" body charset)))
+
+     :else (assoc resp :body (String. ^"[B" body charset)))
+    (assoc resp :body (String. ^"[B" body charset))))
+
+
+(defmethod http/coerce-content-type :application/json [req resp]
+  (coerce-json-body req resp true false))
+
+(defn wrap-request
+  "Returns a HTTP request function coresponding to the given core client."
+  [request]
+  (-> request
+      ;; wrap-log-response
+      http/wrap-request-timing
+      http/wrap-lower-case-headers
+      http/wrap-query-params
+      ;; wrap-basic-auth
+      ;; wrap-oauth
+      ;; wrap-user-info
+      http/wrap-url
+      http/wrap-redirects
+      http/wrap-decompression
+      http/wrap-input-coercion
+      ;; put this before output-coercion, so additional charset
+      ;; headers can be used if desired
+      http/wrap-additional-header-parsing
+      ;; wrap-log-response
+      http/wrap-output-coercion
+      http/wrap-exceptions
+      http/wrap-accept
+      http/wrap-accept-encoding
+      http/wrap-content-type
+      ;; wrap-form-params
+      http/wrap-nested-params
+      http/wrap-method
+      ;; wrap-cookies
+      ;; wrap-links
+      http/wrap-unknown-host))
+
+(def http-request (wrap-request #'http-core/request))
 
 ;;; # Helpers
 (defn api-call
   "Call the docker api via http."
   [{:keys [url] :as endpoint} path request]
   (debugf "api-call %s %s %s" endpoint path request)
-  (http/request
+  (http-request
    (merge
     {:url (str url path)
      :as :auto}
