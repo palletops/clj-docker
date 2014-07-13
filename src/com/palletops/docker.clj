@@ -384,7 +384,7 @@
            :query-params {:t String
                           :q schema/Bool
                           :nocache schema/Bool}
-           :return {}
+           :return schema/Any
            :doc-url "build-an-image-from-dockerfile-via-stdin"
            :doc "Build an image from Dockerfile via stdin"}
    :auth {:path {:fmt "/auth"}
@@ -471,21 +471,8 @@
 (defn api-map-args
   "Define a schema for a map argument."
   [command]
-  (let [{:keys [query-params path method json-body headers return]}
-        (command api)]
-    (merge
-     (zipmap
-      (map #(optional-key %) (keys query-params))
-      (vals query-params))
-     (:args path)
-     (zipmap
-      (map #(optional-key %) (keys json-body))
-      (vals json-body)))))
-
-(defn api-map-return
-  "Define a schema for a map return arguments."
-  [command]
-  (let [{:keys [query-params path method json-body headers return]}
+  (let [{:keys [query-params path method json-body headers return]
+         :as def}
         (command api)]
     (merge
      (zipmap
@@ -495,8 +482,13 @@
      (zipmap
       (map #(optional-key %) (keys json-body))
       (vals json-body))
-     {:command (eq command)})))
+     (select-keys def [:body]))))
 
+(defn api-map-return
+  "Define a schema for a map return arguments."
+  [command]
+  (let [{:keys [return]} (command api)]
+    return))
 
 (defn api-map
   "Given an api call definition map, generate a function that will
@@ -586,7 +578,7 @@
   (let [args (merge query-params (:args path) json-body headers)
         has-params? (seq (keys args))]
     `(defn-api ~(symbol (name command))
-       {:sig [[String
+       {:sig [[{:url String}
                ~@(if has-params?
                    [`(api-map-args ~command)])
                :- (api-map-return ~command)]]
