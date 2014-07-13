@@ -2,7 +2,8 @@
   (:require
    [clojure.java.io :refer [copy file]])
   (:import
-   (java.io File FileInputStream FileOutputStream InputStream OutputStream)
+   (java.io File FileInputStream FileOutputStream InputStream OutputStream
+            PipedInputStream PipedOutputStream)
    (java.security MessageDigest DigestOutputStream)
    (org.apache.commons.compress.archivers.zip ZipArchiveEntry ZipFile)
    (org.apache.commons.compress.archivers.tar
@@ -46,3 +47,40 @@
   (with-open [tar-stream (TarArchiveInputStream. input-stream)]
     (let [^TarArchiveEntry entry (first (tar-entries tar-stream))]
       (extract-entry tar-stream entry target))))
+
+
+(defn tar-output-stream
+  "Return a tar output stream and an input stream that it can be read from."
+  []
+  (let [pis (PipedInputStream.)
+        pos (PipedOutputStream. pis)
+        os (TarArchiveOutputStream. pos)]
+    {:piped-input-stream pis
+     :piped-output-stream pos
+     :tar-output-stream os}))
+
+(defn tar-entry-from-string
+  "Add an entry to a tar archive output stream at path based on a string."
+  [os path s]
+  (let [tmp (doto (File/createTempFile "uberimage" "tmp")
+              (.deleteOnExit))]
+    (try
+      (spit tmp s)
+      (let [entry (TarArchiveEntry. tmp path)]
+        (try
+          (.putArchiveEntry os entry)
+          (copy tmp os)
+          (finally
+            (.closeArchiveEntry os))))
+      (finally
+        (.delete tmp)))))
+
+(defn tar-entry-from-file
+  "Add an entry to a tar archive output stream at path based on a file."
+  [os path f]
+  (let [entry (TarArchiveEntry. f path)]
+    (try
+      (.putArchiveEntry os entry)
+      (copy f os)
+      (finally
+        (.closeArchiveEntry os)))))
