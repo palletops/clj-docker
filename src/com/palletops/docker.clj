@@ -63,7 +63,9 @@
 
 (defn coerce-json-body
   [{:keys [coerce]} {:keys [body status] :as resp} keyword? strict? & [charset]]
-  (let [^String charset (or charset (-> resp :content-type-params :charset) "UTF-8")
+  (let [^String charset (or charset
+                            (-> resp :content-type-params :charset)
+                            "UTF-8")
         body (clj-http.util/force-byte-array body)
         decode-func json-decode]
     (debugf "coerce-json-body %s %s" coerce (http/unexceptional-status? status))
@@ -78,8 +80,7 @@
      (and (not (http/unexceptional-status? status)) (= coerce :exceptional))
      (assoc resp :body (decode-func (String. ^"[B" body charset)))
 
-     :else (assoc resp :body (String. ^"[B" body charset)))
-    (assoc resp :body (String. ^"[B" body charset))))
+     :else (assoc resp :body (String. ^"[B" body charset)))))
 
 
 (defmethod http/coerce-content-type :application/json [req resp]
@@ -105,6 +106,7 @@
       http/wrap-additional-header-parsing
       ;; wrap-log-response
       http/wrap-output-coercion
+      ;; wrap-log-response
       http/wrap-exceptions
       http/wrap-accept
       http/wrap-accept-encoding
