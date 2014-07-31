@@ -1,6 +1,6 @@
 # clj-docker
 
-A wrapper for the [docker API][docker-api].
+A wrapper for the [docker API][docker-api]. Currently supporting [docker API v1.11][supported-api-ver]
 
 This supports only the http endpoint, not the UNIX socket endpoint.
 
@@ -32,3 +32,4 @@ Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
 
 [docker-api]: http://docs.docker.io/reference/api/docker_remote_api_v1.11/ "Docker API"
+[supported-api-ver]: https://docs.docker.com/reference/api/docker_remote_api_v1.11/
