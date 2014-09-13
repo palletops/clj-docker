@@ -145,9 +145,7 @@
 
 (defn read-record
   [^InputStream dis]
-  ;; (println "read-record")
   (let [n (.read dis resp-buf 0 8)]
-    ;; (println "read-record n" n)
     (when (pos? n)
       (assert (= n 8))
       (.rewind hdr-bb)
@@ -170,7 +168,6 @@
   stream type keyword and stream content returns true.  break-fn is called with
   :entry before anything is read."
   ([^InputStream is break-fn filter-fn]
-     ;; (println "Filter-fn" filter-fn)
      (with-open [is is]
        (if-not (break-fn :entry nil)
          (loop [res {}]
@@ -705,14 +702,10 @@
                                       :command :id :result-as :filter-fn))))]
     (when (string? body)
       (.write ^OutputStream (:input resp) (.getBytes ^String body "UTF-8"))
-      (.flush ^OutputStream (:input resp))
-      ;; (println "wrote" (pr-str body))
-      )
+      (.flush ^OutputStream (:input resp)))
     (when body-stream
-      ;; (println "copying body-stream")
       (copy body-stream (:input resp))
       (.flush ^OutputStream (:input resp)))
-    ;; (println "result-as" result-as)
     (case result-as
       :stream resp
       :map (let [res (read-stream-records (:body resp) break-fn filter-fn)]
@@ -725,7 +718,6 @@
    {:keys [id break-fn commands filter-fn]
     :or {filter-fn identity}
     :as request}]
-  ;; (println "container-shell filter-fn" filter-fn)
   (let [eoc (gensym "EXIT")
         eof (gensym "EOF")
         break-fn (or break-fn
@@ -739,7 +731,6 @@ cat << '%s' > cmd$$
 echo %s $?
 "
                      eof commands eof eoc)]
-    ;; (println "body" body)
     (let [resp (docker endpoint
                        {:command :container-attach
                         :id id
@@ -753,7 +744,6 @@ echo %s $?
           resp (assoc (update-in resp [:body] dissoc :stdout :stderr)
                  :out (:stdout (:body resp))
                  :err (:stderr (:body resp)))]
-      ;; (println "resp" (pr-str resp))
       (debugf "container-shell resp :err %s" (pr-str (:err resp)))
       (if-let [[st e] (if-let [out (:out resp)]
                         (re-find (re-pattern (str eoc " " "([0-9]+)")) out))]
@@ -774,7 +764,6 @@ echo %s $?
         body-stream (if local-file
                       (reader (file local-file))
                       content)]
-    ;; (println "body" body)
     (docker endpoint
             {:command :container-attach
              :id id
@@ -802,7 +791,6 @@ echo %s $?
         body-stream (if local-file
                       (reader (file local-file))
                       content)]
-    ;; (println "body" body)
     (docker endpoint
             {:command :container-attach
              :id id
