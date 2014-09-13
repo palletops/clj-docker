@@ -61,7 +61,7 @@
 
 (defn tar-entry-from-string
   "Add an entry to a tar archive output stream at path based on a string."
-  [os path s]
+  [^TarArchiveOutputStream os ^String path s]
   (let [tmp (doto (File/createTempFile "uberimage" "tmp")
               (.deleteOnExit))]
     (try
@@ -75,12 +75,26 @@
       (finally
         (.delete tmp)))))
 
-(defn tar-entry-from-file
-  "Add an entry to a tar archive output stream at path based on a file."
-  [os path f]
+(defn tar-entry-from-file*
+  "Add an entry to a tar archive output stream at path based on a file, f."
+  [^TarArchiveOutputStream os ^String path ^File f]
   (let [entry (TarArchiveEntry. f path)]
     (try
       (.putArchiveEntry os entry)
       (copy f os)
       (finally
         (.closeArchiveEntry os)))))
+
+(defn tar-entry-from-file
+  "Add an entry to a tar archive output stream at path based on a file
+  or directory, f."
+  [^TarArchiveOutputStream os path ^File local-file]
+  (cond
+   (.isFile local-file)
+   (tar-entry-from-file* os path local-file)
+
+   (.isDirectory local-file)
+   (doseq [^java.io.File subdir-file (.listFiles local-file)]
+     (tar-entry-from-file os
+                          (str path "/" (.getName subdir-file))
+                          subdir-file))))

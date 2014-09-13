@@ -13,7 +13,7 @@
   (:import
    org.apache.commons.codec.binary.Base64
    [java.net InetSocketAddress Socket URL]
-   [java.io InputStream]
+   [java.io InputStream OutputStream]
    [com.fasterxml.jackson.core JsonParser]))
 
 
@@ -47,7 +47,7 @@
    (if-let [v (cheshire.parse/parse parser keyword nil nil)]
      (cons v (json-decode-stream parser)))))
 
-(def utf-8 (java.nio.charset.Charset/forName "UTF-8"))
+(def ^java.nio.charset.Charset utf-8 (java.nio.charset.Charset/forName "UTF-8"))
 
 (defn json-decode
   [^String s]
@@ -145,20 +145,18 @@
 
 (defn read-record
   [^InputStream dis]
-  ;; (println "read-record")
   (let [n (.read dis resp-buf 0 8)]
-    ;; (println "read-record n" n)
     (when (pos? n)
       (assert (= n 8))
       (.rewind hdr-bb)
       (.getInt hdr-bb)                  ; skip 4 bytes
-      (let [t (int (aget resp-buf 0))
+      (let [t (int (aget ^bytes resp-buf 0))
             n (.getInt hdr-bb)
             s (loop [r ""
                      n n]
                 (if (pos? n)
                   (let [n2 (.read dis resp-buf 0 (min n resp-buf-size))
-                        r (str r (String. resp-buf 0 n2))]
+                        r (str r (String. ^bytes resp-buf 0 n2))]
                     (if (pos? n2)
                       (recur r (- n n2))
                       r))
@@ -169,8 +167,7 @@
   "Read stream record from is until it is closed, or break-fn called with the
   stream type keyword and stream content returns true.  break-fn is called with
   :entry before anything is read."
-  ([is break-fn filter-fn]
-     ;; (println "Filter-fn" filter-fn)
+  ([^InputStream is break-fn filter-fn]
      (with-open [is is]
        (if-not (break-fn :entry nil)
          (loop [res {}]
@@ -552,7 +549,7 @@
                      (select-keys ~argmap ~(vec (keys json-body))))])
         ~@(if body
             `[:body ~'body])
-        ~@(if (let [accept (:accept headers)]
+        ~@(if (let [^String accept (:accept headers)]
                 (and (string? accept)
                      (or (.contains accept "application/vnd.docker.raw-stream")
                          (.contains accept "application/x-tar"))))
@@ -704,15 +701,11 @@
                               (dissoc request
                                       :command :id :result-as :filter-fn))))]
     (when (string? body)
-      (.write (:input resp) (.getBytes body "UTF-8"))
-      (.flush (:input resp))
-      ;; (println "wrote" (pr-str body))
-      )
+      (.write ^OutputStream (:input resp) (.getBytes ^String body "UTF-8"))
+      (.flush ^OutputStream (:input resp)))
     (when body-stream
-      ;; (println "copying body-stream")
       (copy body-stream (:input resp))
-      (.flush (:input resp)))
-    ;; (println "result-as" result-as)
+      (.flush ^OutputStream (:input resp)))
     (case result-as
       :stream resp
       :map (let [res (read-stream-records (:body resp) break-fn filter-fn)]
@@ -725,11 +718,11 @@
    {:keys [id break-fn commands filter-fn]
     :or {filter-fn identity}
     :as request}]
-  ;; (println "container-shell filter-fn" filter-fn)
   (let [eoc (gensym "EXIT")
         eof (gensym "EOF")
         break-fn (or break-fn
-                     (fn [k v] (and (string? v) (.contains v (name eoc)))))
+                     (fn [k v]
+                       (and (string? v) (.contains ^String v (name eoc)))))
         body (format "
 cat << '%s' > cmd$$
 %s
@@ -738,7 +731,6 @@ cat << '%s' > cmd$$
 echo %s $?
 "
                      eof commands eof eoc)]
-    ;; (println "body" body)
     (let [resp (docker endpoint
                        {:command :container-attach
                         :id id
@@ -752,7 +744,6 @@ echo %s $?
           resp (assoc (update-in resp [:body] dissoc :stdout :stderr)
                  :out (:stdout (:body resp))
                  :err (:stderr (:body resp)))]
-      ;; (println "resp" (pr-str resp))
       (debugf "container-shell resp :err %s" (pr-str (:err resp)))
       (if-let [[st e] (if-let [out (:out resp)]
                         (re-find (re-pattern (str eoc " " "([0-9]+)")) out))]
@@ -773,7 +764,6 @@ echo %s $?
         body-stream (if local-file
                       (reader (file local-file))
                       content)]
-    ;; (println "body" body)
     (docker endpoint
             {:command :container-attach
              :id id
@@ -801,7 +791,6 @@ echo %s $?
         body-stream (if local-file
                       (reader (file local-file))
                       content)]
-    ;; (println "body" body)
     (docker endpoint
             {:command :container-attach
              :id id

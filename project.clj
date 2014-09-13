@@ -1,4 +1,4 @@
-(defproject com.palletops/clj-docker "0.1.1"
+(defproject com.palletops/clj-docker "0.1.2"
   :description "A clojure wrapper for the Docker API"
   :url "https://github.com/palletops/clj-docker"
   :license {:name "Eclipse Public License"
@@ -10,4 +10,5 @@
                  [com.taoensso/timbre "3.1.6"]]
   :profiles {:provided {:dependencies [[org.clojure/clojure "1.6.0"]]}}
   :plugins [[lein-shell "0.4.0"]]
-  :aliases {"doc" ["shell" "bundle" "exec" "jekyll" "serve" "--watch"]})
+  :aliases {"doc" ["shell" "bundle" "exec" "jekyll" "serve" "--watch"]}
+  :global-vars {*warn-on-reflection* true})
