@@ -61,7 +61,7 @@
 
 (defn tar-entry-from-string
   "Add an entry to a tar archive output stream at path based on a string."
-  [os path s]
+  [^TarArchiveOutputStream os ^String path s]
   (let [tmp (doto (File/createTempFile "uberimage" "tmp")
               (.deleteOnExit))]
     (try

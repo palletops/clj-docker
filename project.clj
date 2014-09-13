@@ -10,4 +10,5 @@
                  [com.taoensso/timbre "3.1.6"]]
   :profiles {:provided {:dependencies [[org.clojure/clojure "1.6.0"]]}}
   :plugins [[lein-shell "0.4.0"]]
-  :aliases {"doc" ["shell" "bundle" "exec" "jekyll" "serve" "--watch"]})
+  :aliases {"doc" ["shell" "bundle" "exec" "jekyll" "serve" "--watch"]}
+  :global-vars {*warn-on-reflection* true})

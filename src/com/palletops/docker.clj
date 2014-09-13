@@ -13,7 +13,7 @@
   (:import
    org.apache.commons.codec.binary.Base64
    [java.net InetSocketAddress Socket URL]
-   [java.io InputStream]
+   [java.io InputStream OutputStream]
    [com.fasterxml.jackson.core JsonParser]))
 
 
@@ -47,7 +47,7 @@
    (if-let [v (cheshire.parse/parse parser keyword nil nil)]
      (cons v (json-decode-stream parser)))))
 
-(def utf-8 (java.nio.charset.Charset/forName "UTF-8"))
+(def ^java.nio.charset.Charset utf-8 (java.nio.charset.Charset/forName "UTF-8"))
 
 (defn json-decode
   [^String s]
@@ -152,13 +152,13 @@
       (assert (= n 8))
       (.rewind hdr-bb)
       (.getInt hdr-bb)                  ; skip 4 bytes
-      (let [t (int (aget resp-buf 0))
+      (let [t (int (aget ^bytes resp-buf 0))
             n (.getInt hdr-bb)
             s (loop [r ""
                      n n]
                 (if (pos? n)
                   (let [n2 (.read dis resp-buf 0 (min n resp-buf-size))
-                        r (str r (String. resp-buf 0 n2))]
+                        r (str r (String. ^bytes resp-buf 0 n2))]
                     (if (pos? n2)
                       (recur r (- n n2))
                       r))
@@ -169,7 +169,7 @@
   "Read stream record from is until it is closed, or break-fn called with the
   stream type keyword and stream content returns true.  break-fn is called with
   :entry before anything is read."
-  ([is break-fn filter-fn]
+  ([^InputStream is break-fn filter-fn]
      ;; (println "Filter-fn" filter-fn)
      (with-open [is is]
        (if-not (break-fn :entry nil)
@@ -552,7 +552,7 @@
                      (select-keys ~argmap ~(vec (keys json-body))))])
         ~@(if body
             `[:body ~'body])
-        ~@(if (let [accept (:accept headers)]
+        ~@(if (let [^String accept (:accept headers)]
                 (and (string? accept)
                      (or (.contains accept "application/vnd.docker.raw-stream")
                          (.contains accept "application/x-tar"))))
@@ -704,14 +704,14 @@
                               (dissoc request
                                       :command :id :result-as :filter-fn))))]
     (when (string? body)
-      (.write (:input resp) (.getBytes body "UTF-8"))
-      (.flush (:input resp))
+      (.write ^OutputStream (:input resp) (.getBytes ^String body "UTF-8"))
+      (.flush ^OutputStream (:input resp))
       ;; (println "wrote" (pr-str body))
       )
     (when body-stream
       ;; (println "copying body-stream")
       (copy body-stream (:input resp))
-      (.flush (:input resp)))
+      (.flush ^OutputStream (:input resp)))
     ;; (println "result-as" result-as)
     (case result-as
       :stream resp
@@ -729,7 +729,8 @@
   (let [eoc (gensym "EXIT")
         eof (gensym "EOF")
         break-fn (or break-fn
-                     (fn [k v] (and (string? v) (.contains v (name eoc)))))
+                     (fn [k v]
+                       (and (string? v) (.contains ^String v (name eoc)))))
         body (format "
 cat << '%s' > cmd$$
 %s
