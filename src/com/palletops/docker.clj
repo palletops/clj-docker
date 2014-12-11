@@ -129,6 +129,8 @@
    (merge
     {:url (str url path)
      :as :auto}
+    (select-keys endpoint [:insecure? :keystore :trust-store
+                           :keystore-pass :trust-store-pass])
     request)))
 
 (defn base64-json-header
@@ -577,7 +579,18 @@
   (let [args (merge query-params (:args path) json-body headers)
         has-params? (seq (keys args))]
     `(defn-api ~(symbol (name command))
-       {:sig [[{:url String}
+       {:sig [[{:url String
+                (optional-key :insecure?) schema/Bool
+                (optional-key :keystore) (schema/maybe
+                                          (schema/either
+                                           String
+                                           java.security.KeyStore))
+                (optional-key :keystore-pass) (schema/maybe String)
+                (optional-key :trust-store) (schema/maybe
+                                             (schema/either
+                                              String
+                                              java.security.KeyStore))
+                (optional-key :trust-store-pass) (schema/maybe String)}
                ~@(if has-params?
                    [`(api-map-args ~command)])
                :- (api-map-return ~command)]]
@@ -590,7 +603,7 @@
 
 (defmacro api-calls []
   `(do
-     ~@(for [[command api-def] api]
+     ~@(for [[command api-def] (select-keys api [:build :image-create])]
          (api-call-fn command api-def))))
 
 (api-calls)
