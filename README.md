@@ -4,6 +4,14 @@ A wrapper for the [docker API][docker-api].
 
 This supports only the http endpoint, not the UNIX socket endpoint.
 
+## Installation
+
+Add clj-docker to your `:dependencies`.
+
+```
+[com.palletops/clj-docker "0.1.3"]
+```
+
 ## Usage
 
 There are several ways of using the api.

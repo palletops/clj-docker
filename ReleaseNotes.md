@@ -1,3 +1,9 @@
+## 0.1.3
+
+- Allow use of keystore and trust-store
+  When making http requests, pass through keystore and trust-store related 
+  keys.
+
 ## 0.1.2
 
 - Remove reflection warnings
