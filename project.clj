@@ -1,4 +1,4 @@
-(defproject com.palletops/clj-docker "0.1.3"
+(defproject com.palletops/clj-docker "0.1.4-SNAPSHOT"
   :description "A clojure wrapper for the Docker API"
   :url "https://github.com/palletops/clj-docker"
   :license {:name "Eclipse Public License"
