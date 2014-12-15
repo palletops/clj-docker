@@ -9,7 +9,7 @@ This supports only the http endpoint, not the UNIX socket endpoint.
 Add clj-docker to your `:dependencies`.
 
 ```
-[com.palletops/clj-docker "0.1.3"]
+[com.palletops/clj-docker "0.2.0"]
 ```
 
 ## Usage

@@ -131,6 +131,7 @@
      :as :auto}
     (select-keys endpoint [:insecure? :keystore :trust-store
                            :keystore-pass :trust-store-pass])
+    {:insecure (:insecure? endpoint)}
     request)))
 
 (defn base64-json-header

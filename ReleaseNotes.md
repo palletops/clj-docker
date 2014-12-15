@@ -1,3 +1,8 @@
+## 0.2.0
+
+- Add support for libtrust identity auth
+  Docker machine uses a trust mechanism based on a shared key.
+
 ## 0.1.3
 
 - Allow use of keystore and trust-store
