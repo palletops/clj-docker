@@ -1,5 +1,7 @@
 (ns com.palletops.docker.identity-auth
   "Identity auth scheme as used by docker"
+  (:require
+   [com.palletops.docker.keystore :refer [add-cert]])
   (:import
    [java.net InetAddress Socket]
    [java.security KeyStore SecureRandom]
@@ -35,3 +37,11 @@
         server-cert (first (.getPeerCertificates (.getSession socket)))]
     (.close socket)
     server-cert))
+
+(defn authenticate
+  "Authenticate the server, adding the server's certificate into the keystore."
+  ;; NOTE: this does not use known-hosts.json, and always accepts the
+  ;; server cert. FIXME
+  [host port ks-path keystore ^chars keystore-pw]
+  (let [cert (server-cert host port keystore keystore-pw)]
+    (add-cert ks-path keystore cert keystore-pw)))

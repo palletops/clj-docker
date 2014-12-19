@@ -33,93 +33,92 @@
   (with-open [s (java.io.BufferedInputStream. (io/input-stream path))]
     (.generateCertificate cert-factory s)))
 
-(defn cert-path-key-and-certs
-  "Return a key and certificate chain based on the files in cert-path."
-  [cert-path]
-  (let [ca-f (io/file cert-path "ca.pem")]
-    (if (.exists ca-f)
-      (let [cert-factory (CertificateFactory/getInstance "X.509")
-            ca-cert (load-cert cert-factory ca-f)
-            server-cert (load-cert cert-factory (io/file cert-path "cert.pem"))
-            key (load-key (io/file cert-path "key.pem"))]
-        [key [server-cert ca-cert]])
-      (throw (ex-info (str "No such file: " (str ca-f)) {:file (str ca-f)})))))
+(defn key-and-certs
+  "Return a key and certificate chain based on key-path and the
+  certificate chain in cert-paths."
+  [key-path cert-paths]
+  [(load-key (io/file key-path))
+   (let [cert-factory (CertificateFactory/getInstance "X.509")]
+     (map #(load-cert cert-factory (io/file %)) cert-paths))])
+
+(defn fill-keystore
+  [^KeyStore ks ^chars key-pw key certs]
+  (doseq [[cert cert-num] (map vector certs (range))]
+    (.setEntry
+     ks (str "cert" cert-num)
+     (java.security.KeyStore$TrustedCertificateEntry. cert)
+     nil))
+  (.setKeyEntry ks "key" key key-pw (into-array X509Certificate certs))
+  ks)
+
+(defn ^KeyStore key-store-load
+  "Load a keystore file if it exists.  Returns nil if the path does not exist or
+  is a zero length file."
+  [^KeyStore ks ^File ks-path ^chars pw]
+  (if (and (.exists ks-path) (pos? (.length ks-path)))
+    (doto ks
+      (.load (io/input-stream ks-path) pw))))
+
+(defn ^KeyStore key-store-create
+  "Create a keystore file, with the given key and certificates."
+  [^KeyStore ks ^File ks-path ^chars pw ^Key key certs]
+  (.load ks nil pw)
+  (fill-keystore ks pw key certs)
+  (with-open [os (io/output-stream ks-path)]
+    (.store ks os pw))
+  ks)
 
 (defn ^String key-store
   "Return a JKS format keystore, containing the creds specified in
-  files in cert-path."
-  [cert-path]
-  (let [ks-path (io/file cert-path "client.ks")
-        ks (KeyStore/getInstance "JKS")
-        pw (.toCharArray "")]
-    (if (and (.exists ks-path) (pos? (.length ks-path)))
-      [(str ks-path) (doto ks
-                       (.load (io/input-stream ks-path) pw))]
-      (let [[key [server-cert ca-cert]] (cert-path-key-and-certs cert-path)]
-        (doto ks
-          (.load nil pw)
-          (.setEntry
-           "ca"
-           (java.security.KeyStore$TrustedCertificateEntry. ca-cert)
-           nil)
-          (.setEntry
-           "server"
-           (java.security.KeyStore$TrustedCertificateEntry. server-cert)
-           nil)
-          (.setKeyEntry
-           "client" key pw
-           (into-array X509Certificate [server-cert ca-cert])))
-        (with-open [os (io/output-stream ks-path)]
-          (.store ks os pw))
-        [(str ks-path) ks]))))
+  files in cert-path.  If the keystore file exists already, simply
+  load it."
+  ([cert-dir]
+   (key-store
+    (io/file cert-dir "key.pem")
+    [(io/file cert-dir "cert.pem")      ; order is important here
+     (io/file cert-dir "ca.pem")]))
+  ([key-path cert-paths]
+   (let [ks-path (io/file (.getParent (io/file key-path)) "client.ks")
+         ks (KeyStore/getInstance "JKS")
+         pw (.toCharArray "")]
+     (or (key-store-load ks ks-path pw)
+         (let [[key certs] (key-and-certs key-path cert-paths)]
+           (key-store-create ks ks-path pw key certs))))))
 
-(defn jwk-key-and-cert
+(defn jwk-key-and-certs
   "Return the private key specified by jwk-path.  The adjacent public
   key is also read and returned.  A self-signed X509Certificate is
-  create as a client certificate and returned."
-  [jwk-path]
-  (let [f (io/file jwk-path)]
-    (if (.exists f)
-      (let [key (load-jwk f)
-            public-key (load-jwk
-                        (io/file (.getParent f) "public-key.json"))
-            cert (new-cert {:key key
-                            :public-key public-key
-                            :client-auth true
-                            :server-auth false})]
-
-        [key public-key cert])
-      (throw (ex-info (str "No such file: " (str f)) {:file (str f)})))))
-
+  created a client certificate and returned as a certificate chain in
+  the second element of the return value."
+  [private-key-path public-key-path]
+  (let [key (load-jwk private-key-path)
+        public-key (load-jwk public-key-path)
+        cert (new-cert {:key key
+                        :public-key public-key
+                        :client-auth true
+                        :server-auth false})]
+    [key [cert]]))
 
 (defn ^String key-store-jwk
   "Return a JKS format keystore, containing the orivate key specified
-  by jwk-path.  The adjacent public key is also read and a self-signed
-  X509Certificate is create as a client certificate."
-  [jwk-path]
-  (let [ks-path (io/file (.getParentFile (io/file jwk-path)) "client.ks")
-        ks (KeyStore/getInstance "JKS")
-        pw (.toCharArray "")]
-    (if (and (.exists ks-path) (pos? (.length ks-path)))
-      [(str ks-path) (doto ks
-                       (.load (io/input-stream ks-path) pw))]
-      (let [[key public-key cert] (jwk-key-and-cert jwk-path)]
-        (doto ks
-          (.load nil pw)
-          (.setEntry
-           "client"
-           (java.security.KeyStore$TrustedCertificateEntry. cert)
-           nil)
-          (.setKeyEntry "clientkey" key pw
-                        (into-array X509Certificate [cert])))
-        (with-open [os (io/output-stream ks-path)]
-          (.store ks os pw))
-        [(str ks-path) ks]))))
+  by key-dir or key-path.  The adjacent public key is also read and a
+  self-signed X509Certificate is create as a client certificate."
+  ([key-dir]
+   (key-store-jwk
+    (io/file key-dir "key.json")
+    (io/file key-dir "public-key.json")))
+  ([key-path public-key-path]
+   (let [ks-path (io/file (.getParent (io/file key-path)) "client.ks")
+         ks (KeyStore/getInstance "JKS")
+         pw (.toCharArray "")]
+     (or (key-store-load ks ks-path pw)
+         (let [[key certs] (jwk-key-and-certs key-path public-key-path)]
+           (key-store-create ks ks-path pw key certs))))))
 
 (defn add-cert
-  "Add a cert to the specified keystore"
-  [ks-path ^KeyStore ks ^X509Certificate cert]
+  "Add a cert to the specified keystore, storing it."
+  [ks-path ^KeyStore ks ^X509Certificate cert ks-pass]
   (.setEntry
    ks "server" (java.security.KeyStore$TrustedCertificateEntry. cert) nil)
   (with-open [os (io/output-stream ks-path)]
-    (.store ks os (.toCharArray ""))))
+    (.store ks os ks-pass)))
