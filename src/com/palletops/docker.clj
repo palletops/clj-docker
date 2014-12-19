@@ -9,7 +9,7 @@
    [com.palletops.api-builder.api
     :refer [defn-api defmulti-api defmethod-api def-api]]
    [schema.core :as schema :refer [eq explain optional-key]]
-   [taoensso.timbre :refer [debugf]])
+   [taoensso.timbre :refer [debugf tracef]])
   (:import
    org.apache.commons.codec.binary.Base64
    [java.net InetSocketAddress Socket URL]
@@ -44,20 +44,23 @@
   "Return a lazy sequence of json objects returned by the parser."
   [^JsonParser parser]
   (lazy-seq
-   (if-let [v (cheshire.parse/parse parser keyword nil nil)]
-     (cons v (json-decode-stream parser)))))
+   (if-let [v (and parser (cheshire.parse/parse parser keyword nil nil))]
+     (cons v (json-decode-stream (if (sequential? v) nil parser))))))
 
 (def ^java.nio.charset.Charset utf-8 (java.nio.charset.Charset/forName "UTF-8"))
 
 (defn json-decode
   [^String s]
-  (debugf "json-decode %s" s)
+  (tracef "json-decode %s" s)
   (with-open [is (java.io.ByteArrayInputStream. (.getBytes s utf-8))
               r (reader is)]
     (let [parser (json-parser r)
           resp (json-decode-stream parser)]
+      (tracef "json-decode resp %s %s" (count resp) (pr-str resp))
       (if (= 1 (count resp))
-        (first resp)
+        (do ; ensure fully realised
+          (seq (first resp))
+          (first resp))
         (vec resp)))))
 
 
@@ -69,6 +72,7 @@
         body (clj-http.util/force-byte-array body)
         decode-func json-decode]
     (debugf "coerce-json-body %s %s" coerce (http/unexceptional-status? status))
+    (debugf "coerce-json-body headers %s" (:headers resp))
     (cond
      (= coerce :always)
      (assoc resp :body (decode-func (String. ^"[B" body charset)))
@@ -190,6 +194,26 @@
   "http://docs.docker.io/reference/api/docker_remote_api_v1.11/#")
 
 (def ContainerId String)
+(def ImageId String)
+(def ImageInfo {:Id ImageId
+                :ParentId ImageId
+                :Size schema/Int
+                :RepoTags [String]
+                :VirtualSize schema/Int
+                :Created schema/Int})
+(def ContainerInfo {:Id ContainerId
+                    :Image String
+                    :Command String
+                    :Created schema/Int
+                    :Status String
+                    :Ports [{:PrivatePort schema/Int
+                             :Type String
+                             (optional-key :IP) String
+                             (optional-key :PublicPort) schema/Int}]
+                    :Names [String]
+                    (optional-key :SizeRw) schema/Int
+                    (optional-key :SizeRootFs) schema/Int})
+
 
 (def api
   {:containers {:query-params {:all schema/Bool
@@ -199,14 +223,7 @@
                                :size schema/Bool}
                 :path {:fmt "/containers/json" :arg-order [] :args {}}
                 :method :get
-                :return {"Id" ContainerId
-                         "Image" String
-                         "Command" String
-                         "Created" schema/Int
-                         "Status" String
-                         "Ports" [schema/Int]
-                         (optional-key "SizeRw") schema/Int
-                         (optional-key "SizeRootFs") schema/Int}
+                :return [ContainerInfo]
                 :doc-url "list-containers"
                 :doc "List containers."}
    :container-create {:path {:fmt "/containers/create"}
@@ -228,12 +245,14 @@
                                   :Dns String
                                   :Image String
                                   :Volumes {String schema/Any}
-                                  :VolumesFrom String
                                   :WorkingDir String
                                   :DisableNetwork schema/Bool
-                                  :ExposedPorts {String schema/Any}}
+                                  :ExposedPorts {String schema/Any}
+                                  :HostConfig {:VolumesFrom [String]}}
                       :doc-url "create-a-container"
-                      :doc "Create a container"}
+                      :doc "Create a container"
+                      :return {:Id String
+                               :Warnings [String]}}
    :container {:path {:fmt "/containers/%s/json"
                       :args {:id ContainerId}
                       :arg-order [:id]}
@@ -282,7 +301,8 @@
                                  :PublishAllPorts schema/Bool
                                  :Privileged schema/Bool}
                      :doc-url "start-a-container"
-                     :doc "Start the container id."}
+                     :doc "Start the container id."
+                     :return (schema/eq nil)}
    :container-stop {:path {:fmt "/containers/%s/stop"
                            :args {:id ContainerId}
                            :arg-order [:id]}
@@ -327,7 +347,8 @@
    :images {:path {:fmt "/images/json"}
             :method :get
             :doc-url "list-images"
-            :doc "List images."}
+            :doc "List images."
+            :return [ImageInfo]}
    :image-create
    {:path {:fmt "/images/create"}
     :method :post
@@ -489,8 +510,7 @@
 (defn api-map-return
   "Define a schema for a map return arguments."
   [command]
-  (let [{:keys [return]} (command api)]
-    return))
+  (:return (command api) schema/Any))
 
 (defn api-map
   "Given an api call definition map, generate a function that will
@@ -599,12 +619,14 @@
        [~'endpoint
         ~@(if has-params?
             [`{:keys [~@(map (comp symbol name) (keys args))] :as ~'params}])]
-       (let [req# (api-req ~command ~(if has-params? 'params {}))]
-         (api-call ~'endpoint (:path req#) (dissoc req# :path))))))
+       (let [req# (api-req ~command ~(if has-params? 'params {}))
+             resp# (api-call ~'endpoint (:path req#) (dissoc req# :path))]
+         (or (:body resp#) ;; resp#
+             )))))
 
 (defmacro api-calls []
   `(do
-     ~@(for [[command api-def] (select-keys api [:build :image-create])]
+     ~@(for [[command api-def] api]
          (api-call-fn command api-def))))
 
 (api-calls)
