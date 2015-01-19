@@ -693,11 +693,24 @@
 
 
 ;;; # Map based calls to Docker API
+(def Endpoint
+  {:url String
+   (optional-key :insecure?) schema/Bool
+   (optional-key :keystore) (schema/maybe
+                             (schema/either
+                              String
+                              java.security.KeyStore))
+   (optional-key :keystore-pass) (schema/maybe String)
+   (optional-key :trust-store) (schema/maybe
+                                (schema/either
+                                 String
+                                 java.security.KeyStore))
+   (optional-key :trust-store-pass) (schema/maybe String)})
 
 (defmulti-api docker
   "Call the docker API based on a map specifying the command to be called,
   and and arguments."
-  {:sig [[{:url String} {schema/Any schema/Any} :- {schema/Any schema/Any}]]}
+  {:sig [[Endpoint {schema/Any schema/Any} :- {schema/Any schema/Any}]]}
   (fn [{:keys [url] :as endpoint}
        {:keys [command] :as request}]
     {:pre [(keyword? command)]}
