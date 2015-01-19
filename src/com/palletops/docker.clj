@@ -175,17 +175,17 @@
   stream type keyword and stream content returns true.  break-fn is called with
   :entry before anything is read."
   ([^InputStream is break-fn filter-fn]
-     (with-open [is is]
-       (if-not (break-fn :entry nil)
-         (loop [res {}]
-           (if-let [[k s] (read-record is)]
-             (let [res (update-in res [k] str (filter-fn s))]
-               (if (break-fn k s)
-                 res
-                 (recur res)))
-             res)))))
+   (with-open [is is]
+     (if-not (break-fn :entry nil)
+       (loop [res {}]
+         (if-let [[k s] (read-record is)]
+           (let [res (update-in res [k] str (filter-fn s))]
+             (if (break-fn k s)
+               res
+               (recur res)))
+           res)))))
   ([is break-fn]
-     (read-stream-records is break-fn identity)))
+   (read-stream-records is break-fn identity)))
 
 ;;; # API data map
 
