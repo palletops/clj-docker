@@ -45,7 +45,7 @@
   [^JsonParser parser]
   (lazy-seq
    (if-let [v (and parser (cheshire.parse/parse parser keyword nil nil))]
-     (cons v (json-decode-stream (if (sequential? v) nil parser))))))
+     (cons v (json-decode-stream (if-not (sequential? v) parser))))))
 
 (def ^java.nio.charset.Charset utf-8 (java.nio.charset.Charset/forName "UTF-8"))
 
