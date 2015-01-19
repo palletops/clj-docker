@@ -229,26 +229,41 @@
    :container-create {:path {:fmt "/containers/create"}
                       :method :post
                       :query-params {:name String}
-                      :json-body {:Hostname String
-                                  :User String
-                                  :Memory schema/Int
-                                  :MemorySwap schema/Int
-                                  :AttachStdin schema/Bool
-                                  :AttachStdout schema/Bool
-                                  :AttachStderr schema/Bool
-                                  :PortSpecs {String schema/Any}
-                                  :Tty schema/Bool
-                                  :OpenStdin schema/Bool
-                                  :StdinOnce schema/Bool
-                                  :Env {String String}
-                                  :Cmd (schema/either String [String])
-                                  :Dns String
-                                  :Image String
-                                  :Volumes {String schema/Any}
-                                  :WorkingDir String
-                                  :DisableNetwork schema/Bool
-                                  :ExposedPorts {String schema/Any}
-                                  :HostConfig {:VolumesFrom [String]}}
+                      :json-body
+                      {:Hostname String
+                       :User String
+                       :Memory schema/Int
+                       :MemorySwap schema/Int
+                       :AttachStdin schema/Bool
+                       :AttachStdout schema/Bool
+                       :AttachStderr schema/Bool
+                       :PortSpecs {String schema/Any}
+                       :Tty schema/Bool
+                       :OpenStdin schema/Bool
+                       :StdinOnce schema/Bool
+                       :Env [String]
+                       :Cmd (schema/either String [String])
+                       :Dns String
+                       :Image String
+                       :Volumes {String schema/Any}
+                       :WorkingDir String
+                       :DisableNetwork schema/Bool
+                       :ExposedPorts {String schema/Any}
+                       :HostConfig
+                       {(optional-key :VolumesFrom) [String]
+                        (optional-key :Binds) [String]
+                        (optional-key :Links) [String]
+                        (optional-key :LxcConf) {String String}
+                        (optional-key :PortBindings) {String [{String String}]}
+                        (optional-key :PublishAllPorts) schema/Bool
+                        (optional-key :Privileged) schema/Bool
+                        (optional-key :Dns) [String]
+                        (optional-key :DnsSearch) [String]
+                        (optional-key :CapAdd) [String]
+                        (optional-key :CapDrop) [String]
+                        (optional-key :RestartPolicy) {String schema/Any}
+                        (optional-key :NetworkMode) String
+                        (optional-key :Devices) [String]}}
                       :doc-url "create-a-container"
                       :doc "Create a container"
                       :return {:Id String
