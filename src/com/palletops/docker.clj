@@ -808,13 +808,35 @@
                              (format "/containers/%s/attach" id)
                              (http/generate-query-string
                               (dissoc request
-                                      :command :id :result-as :filter-fn))))]
+                                      :command :id :result-as :filter-fn
+                                      :break-fn :body))))]
+    (debugf "container-attach resp %s" resp)
     (when (string? body)
       (.write ^OutputStream (:input resp) (.getBytes ^String body "UTF-8"))
       (.flush ^OutputStream (:input resp)))
     (when body-stream
       (copy body-stream (:input resp))
       (.flush ^OutputStream (:input resp)))
+    (debugf "container-attach result-as %s" result-as)
+    (case result-as
+      :stream resp
+      :map (let [res (read-stream-records (:body resp) break-fn filter-fn)]
+             (assoc resp :body res)))))
+
+(defmethod-api docker :container-logs
+  [endpoint
+   {:keys [id result-as stdout stderr follow tail timestamps break-fn filter-fn]
+    :or {break-fn (constantly false)
+         result-as :map}
+    :as request}]
+  {:pre [id (string? id)]}
+  (let [resp (attach (format "%s%s?%s"
+                             (:url endpoint)
+                             (format "/containers/%s/logs" id)
+                             (http/generate-query-string
+                              (dissoc request
+                                      :command :id :result-as :filter-fn
+                                      :break-fn))))]
     (case result-as
       :stream resp
       :map (let [res (read-stream-records (:body resp) break-fn filter-fn)]
