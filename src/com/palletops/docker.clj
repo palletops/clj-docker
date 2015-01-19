@@ -371,7 +371,8 @@
     :query-params {:repo String
                    :tag String
                    :registry String
-                   :fromSource String}
+                   :fromSource String
+                   :fromImage String}
     :doc-url "create-an-image"
     :doc
     "Create an image, either by pull it from the registry or by importing it."}
