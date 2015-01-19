@@ -70,8 +70,8 @@
           :keystore-pass ""}
          (connection-options
           {:host "tcp://localhost/some/path" :tls "1" :tls-verify "0"})))
-  (is (= {:url "https://somehost:2376"
-          :tls true
+  (is (= {:url "http://somehost:2376"
+          :tls false
           :verify false
           :auth :none
           :keystore nil

@@ -48,7 +48,10 @@
   [{:keys [^String host auth tls tls-verify cert-path
            auth-ca auth-cert auth-key]}]
   (if (and host (.startsWith host "tcp:"))
-    (let [tls (boolean (or (and (not= tls-verify "") (not= tls-verify "0"))
+    (let [tls (boolean (or (and (not= tls-verify "")
+                                (not= tls-verify "0")
+                                (not (nil? tls-verify))
+                                (not= auth "none"))
                            (and (not= auth "none")
                                 (or auth
                                     (not= tls "no")))))
