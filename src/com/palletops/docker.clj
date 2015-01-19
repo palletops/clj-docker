@@ -493,7 +493,51 @@
    {:path {:fmt "/images/load"}
     :body (schema/either String java.io.InputStream)
     :doc-url "load-a-tarball-with-a-set-of-images-and-tags-into-docker"
-    :doc "Load a set of images and tags into the docker repository."}})
+    :doc "Load a set of images and tags into the docker repository."}
+
+   :exec-create {:path {:fmt "/containers/%s/exec"
+                        :args {:id String} :arg-order [:id]}
+                 :method :post
+                 :headers {:content-type "text/plain; charset=utf-8"}
+                 :json-body
+                 {:AttachStdin schema/Bool
+                  :AttachStdout schema/Bool
+                  :AttachStderr schema/Bool
+                  :Tty schema/Bool
+                  :Cmd (schema/either String [String])}
+                 :doc-url "exec-create"
+                 :doc "Create an exec instance in a running container."
+                 :return {:Id String}}
+   :exec-start {:path {:fmt "/exec/%s/start"
+                       :args {:id String} :arg-order [:id]}
+                :method :post
+                ;; :body java.io.InputStream
+                :headers {:accept "application/vnd.docker.raw-stream"}
+                :json-body
+                {:Detach schema/Bool
+                 :Tty schema/Bool}
+                :doc-url "exec-start"
+                :doc "Starts a previously set up exec instance id. If
+                detach is true, this API returns after starting the
+                exec command. Otherwise, this API sets up an
+                interactive session with the exec command."}
+   :exec-resize {:path {:fmt "/exec/%s/resize"
+                        :args {:id String} :arg-order [:id]}
+                 :method :post
+                 :json-body
+                 {:h schema/Int
+                  :w schema/Int}
+                 :doc-url "exec-resize"
+                 :doc "Resizes the tty session used by the exec
+                 command id. This API is valid only if tty was
+                 specified as part of creating and starting the exec
+                 command."}
+   :exec-inspect {:path {:fmt "/exec/%s/json"
+                         :args {:id String} :arg-order [:id]}
+                  :method :get
+                  :doc-url "exec-resize"
+                  :doc "Return low-level information about the exec
+                  command id."}})
 
 ;;; ## Data based interface
 
