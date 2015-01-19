@@ -11,8 +11,7 @@
   (.getCanonicalPath
    (io/file
     (System/getProperty "user.home")
-    ".docker"
-    "key.json")))
+    ".docker")))
 
 (defn env-vars
   "Read all docker related environment variables."
@@ -49,7 +48,7 @@
   [{:keys [^String host auth tls tls-verify cert-path
            auth-ca auth-cert auth-key]}]
   (if (and host (.startsWith host "tcp:"))
-    (let [tls (boolean (or tls-verify
+    (let [tls (boolean (or (and (not= tls-verify "") (not= tls-verify "0"))
                            (and (not= auth "none")
                                 (or auth
                                     (not= tls "no")))))

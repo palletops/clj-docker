@@ -66,7 +66,7 @@
   (fill-keystore ks pw key certs)
   (with-open [os (io/output-stream ks-path)]
     (.store ks os pw))
-  ks)
+  [ks-path ks])
 
 (defn ^String key-store
   "Return a JKS format keystore, containing the creds specified in
@@ -81,7 +81,8 @@
    (let [ks-path (io/file (.getParent (io/file key-path)) "client.ks")
          ks (KeyStore/getInstance "JKS")
          pw (.toCharArray "")]
-     (or (key-store-load ks ks-path pw)
+     (or (if-let [ks (key-store-load ks ks-path pw)]
+           [ks-path ks])
          (let [[key certs] (key-and-certs key-path cert-paths)]
            (key-store-create ks ks-path pw key certs))))))
 
@@ -111,7 +112,8 @@
    (let [ks-path (io/file (.getParent (io/file key-path)) "client.ks")
          ks (KeyStore/getInstance "JKS")
          pw (.toCharArray "")]
-     (or (key-store-load ks ks-path pw)
+     (or (if-let [ks (key-store-load ks ks-path pw)]
+           [ks-path ks])
          (let [[key certs] (jwk-key-and-certs key-path public-key-path)]
            (key-store-create ks ks-path pw key certs))))))
 
